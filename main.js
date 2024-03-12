@@ -6,7 +6,10 @@ import * as THREE from 'three'
 
 import guiMove from './utils/gui'
 
+import {CSS3DObject} from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 
+let video
+let videoStatus
 // 创建分组
 
 const group = new THREE.Group()
@@ -106,7 +109,11 @@ const sceneInfoObj = {
         //  wh: [0.05, 0.05],
          position: [0.49, 0, 0],
          rotation: [0, -0.5*Math.PI, 0],
-         targetAttr: 'five'
+         targetAttr: 'five',
+        //  回调函数
+        active(){
+          setMaterialCube(sceneInfoObj.five)
+        }
        }
      ]
   },
@@ -130,15 +137,19 @@ const sceneInfoObj = {
         name: 'landMark',
         imgUrl: 'other/landmark.png',
         wh: [0.05, 0.05],
-        position: [-0.05, -0.08, 0.46],
+        position: [0.05, 0.08, 0.46],
         rotation: [5.41, 2.91, 4.79],
         targetAttr: 'six'
       },
       {
         name:'video',
         imgUrl: 'video/movie.mp4',
+        // 物体的宽高
+        wh: [0.2, 0.1],
+        // 物体的位置坐标
         position: [0.49, 0.04, 0.045],
-        rotation: [0, -0.5*Math.PI, 0],
+        // 物体的旋转角度
+        rotation: [0, -0.5 * Math.PI, 0],
       }
     ]
   },
@@ -206,6 +217,8 @@ function setMaterialCube(infoObj) {
   markList.forEach(markObj => {
     // 如果场景里存在标记点则调用创建标记点方法
     if (markObj.name === 'landMark') createLandMark(markObj)
+    else if(markObj.name==='dom') createDomMark(markObj)
+    else if(markObj.name==='video') createVideoMark(markObj)
   })
   // 几何体添加到分组
   scene.add(group)
@@ -242,6 +255,56 @@ function createLandMark(infoObj) {
   group.add(plane)
 }
 
+
+// 创建文本标记点
+function createDomMark(infoObj) {
+  let { position,rotation,targetAttr,name } = infoObj
+  const tag = document.createElement('span')
+  tag.className = 'mark-style'
+  tag.innerHTML = '前进'
+  tag.style.color='#fff'
+  tag.style.pointerEvents='all'
+  tag.addEventListener('click',(e)=>{
+    // active(e)
+    setMaterialCube(sceneInfoObj.five)
+  })
+
+  const tag3d = new CSS3DObject(tag)
+  tag3d.scale.set(1/800,1/800,1/800)
+  tag3d.position.set(...position)
+  tag3d.rotation.set(...rotation)
+  group.add(tag3d)
+}
+
+// 创建视频标记
+function createVideoMark(infoObj) {
+  const { imgUrl,position,rotation,name,wh } = infoObj
+  video = document.createElement('video')
+  // video.style.pointerEvents='all'
+  video.src = imgUrl
+  video.muted = true
+  video.addEventListener('loadedmetadata',()=>{
+    video.play()
+    videoStatus = true
+    video.muted = false
+  })
+
+  // 创建纹理加载起
+  const texture = new THREE.VideoTexture(video)
+
+  const geometry = new THREE.PlaneGeometry(...wh);
+  const material = new THREE.MeshBasicMaterial({
+    map:texture,
+  })
+  const plane = new THREE.Mesh(geometry, material);
+
+  plane.position.set(...position)
+  plane.rotation.set(...rotation)
+  plane.name = name
+  guiMove(plane)
+  group.add(plane)
+}
+
 // 清除上一个场景标记点
 function clear() {
   const list = [...group.children]
@@ -266,9 +329,20 @@ function bindClick() {
     const intersects = raycaster.intersectObjects(scene.children)
 
     const obj = intersects.find(item => item.object.name === 'landMark')
+    const videoObj = intersects.find(item => item.object.name === 'video')
     if (obj) {
       const infoObj = sceneInfoObj[obj.object.userData.targetAttr]
       if (infoObj) setMaterialCube(infoObj)
+    }
+
+    if(videoObj){
+      if(videoStatus){
+        video.pause()
+        videoStatus = false
+      }else{
+        video.play()
+        videoStatus = true
+      }
     }
 
   })
